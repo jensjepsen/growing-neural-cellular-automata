@@ -1,0 +1,3 @@
+pytorch-lightning
+pytest
+pillow
