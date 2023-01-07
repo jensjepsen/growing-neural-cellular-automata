@@ -1,4 +1,4 @@
-import os, typer, pytorch_lightning as pl
+import os, typer, pytorch_lightning as pl, torch
 import model
 
 app = typer.Typer()
@@ -9,8 +9,17 @@ def train(image_num: int=0, epochs: int=200, output_path: str='frontend/public/m
     
     lm = model.Model(image_num=image_num, use_pool=use_pool, use_damage=use_damage)
 
-    trainer = pl.Trainer(max_epochs=epochs)
-
+    trainer = pl.Trainer(
+        max_epochs=epochs,
+        **(
+            {
+                'accelerator': 'gpu',
+                'devices': 1,
+            }
+            if torch.cuda.is_available()
+            else {}
+        )
+    )
     trainer.fit(lm)
 
     lm.export_onnx(output_path.format(**args))
