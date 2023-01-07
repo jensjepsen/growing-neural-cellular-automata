@@ -2,3 +2,4 @@ pytorch-lightning
 pytest
 pillow
 typer
+torchvision
