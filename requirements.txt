@@ -1,3 +1,4 @@
 pytorch-lightning
 pytest
 pillow
+typer

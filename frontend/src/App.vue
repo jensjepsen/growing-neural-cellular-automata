@@ -5,5 +5,7 @@
   <Intro></Intro>
 </template>
 
-<style scoped>
+<style>
+@import "prismjs/themes/prism.css";
+
 </style>

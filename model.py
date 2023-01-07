@@ -66,7 +66,7 @@ class Cell(nn.Module):
             A grid of each individual cells perception is calculated,
             before each cell observes and acts on perception
         """
-        state_grid = state_grid.permute(0, 3, 1, 2)
+        state_grid = state_grid.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format)
         sobel_x = F.conv2d(input=state_grid, weight=self.sobel_x, stride=1, padding=1, groups=self.cell_state_dimension)
         sobel_y = F.conv2d(input=state_grid, weight=self.sobel_y, stride=1, padding=1, groups=self.cell_state_dimension)
         
@@ -76,7 +76,7 @@ class Cell(nn.Module):
             sobel_x,
             sobel_y
         ], dim=1)
-        perception_grid = perception_grid.permute(0, 2, 3, 1)
+        perception_grid = perception_grid.permute(0, 2, 3, 1).to(memory_format=torch.contiguous_format)
         
         return perception_grid
     
@@ -97,7 +97,7 @@ class Cell(nn.Module):
         
         # Do probabilistic update,
         # to simulate that cells update at different times
-        mask = ((torch.rand(update.shape[0], self.input_shape[0], self.input_shape[1], device=state_grid.device) > self.update_probability) * 1.0).unsqueeze(-1)
+        mask = ((torch.rand(update.shape[0], self.input_shape[0], self.input_shape[1]) > self.update_probability) * 1.0).unsqueeze(-1).to(state_grid.device)
         
         update = (
             update
@@ -113,8 +113,10 @@ class Cell(nn.Module):
             state_grid = self.get_initial_state(batch_size=batch_size)
         else:
             state_grid = initial_state
+        
         states = [state_grid]
-        for step in range(steps):
+        
+        for _ in range(steps):
             state_grid = self.update(state_grid)
             states.append(state_grid)
         
@@ -142,10 +144,11 @@ class ONNXWrapper(nn.Module):
             return rgb, last_state
 
 class DataSet(torch.utils.data.Dataset):
-    def __init__(self) -> None:
+    def __init__(self, image_num: int=0) -> None:
         super().__init__()
         with PIL.Image.open('images/emoji.png') as im:
-            self.image = torch.tensor(np.array(im) / 255.0, dtype=torch.float32)[:, 0:40, :]
+            im = np.array(im)
+        self.image = torch.tensor(im / 255.0, dtype=torch.float32)[:, 0 + 40*image_num:40 * (image_num + 1), :]
             
     
     def __getitem__(self, idx):
@@ -156,7 +159,15 @@ class DataSet(torch.utils.data.Dataset):
 
 
 class Model(pl.LightningModule):
-    def __init__(self, use_pool=True, use_damage=True, input_shape=(40, 40), damage_num=3) -> None:
+    def __init__(
+                self,
+                use_pool: bool=True,
+                use_damage: bool=True,
+                input_shape: typing.Tuple[int, int]=(40, 40),
+                damage_num: int=3,
+                image_num: int=0,
+                batch_size: int=10
+            ) -> None:
         super().__init__()
         self.cell: Cell = torch.jit.script(Cell())
         
@@ -165,12 +176,14 @@ class Model(pl.LightningModule):
 
         self.input_shape = input_shape
         self.damage_num = damage_num
+        self.image_num = image_num
+        self.batch_size = batch_size
 
         if use_pool:
-            self.pool: torch.Tensor = self.cell.initial_state.expand(1024, self.cell.input_shape[0], self.cell.input_shape[1], self.cell.cell_state_dimension).clone()
+            self.register_buffer('pool', self.cell.initial_state.expand(1024, self.cell.input_shape[0], self.cell.input_shape[1], self.cell.cell_state_dimension).clone())
     
     def sample_pool(self, samples):
-        idxs = torch.randint(0, self.pool.shape[0] - 1, (samples,))
+        idxs = torch.randint(0, self.pool.shape[0] - 1, (samples,)).to(self.device)
         return idxs, self.pool[idxs]
 
     def export_onnx(self, path: str, **kwargs):
@@ -192,17 +205,18 @@ class Model(pl.LightningModule):
         return self.item_loss(output, target).mean(dim=0)
 
     def training_step(self, batch, batch_idx):
+        target = batch[0].to(self.device)
         with torch.no_grad():
             if self.use_pool:
                 pool_idxs, pool_samples = self.sample_pool(batch.shape[0])
-                pool_loss = self.item_loss(pool_samples, batch[0])
+                pool_loss = self.item_loss(pool_samples, target)
                 _, sorted_loss_idxs = pool_loss.sort(descending=True)
                 sorted_pool_samples, sorted_pool_idxs = pool_samples[sorted_loss_idxs], pool_idxs[sorted_loss_idxs]
                 initial_state = sorted_pool_samples
                 
                 initial_state[0] = self.cell.initial_state
                 if self.use_damage:
-                    mask = damage_mask(self.damage_num, self.input_shape[0], self.input_shape[1]).unsqueeze(-1)
+                    mask = damage_mask(self.damage_num, self.input_shape[0], self.input_shape[1]).unsqueeze(-1).to(self.device)
                     initial_state[-self.damage_num:] = initial_state[-self.damage_num:] * mask
 
             else:
@@ -214,11 +228,11 @@ class Model(pl.LightningModule):
             if self.use_pool:
                 self.pool[sorted_pool_idxs] = raw[-1].detach()
 
-        if batch_idx % 5 == 0:
-            grid = torchvision.utils.make_grid(output[-1].permute(0, 3, 1, 2))
+        #if batch_idx % 5 == 0:
+        #    grid = torchvision.utils.make_grid(output[-1].permute(0, 3, 1, 2))
             
-            self.logger.experiment.add_image('test', grid, self.current_epoch)
-        return self.loss(raw[-1], batch[0])
+        #    self.logger.experiment.add_image('test', grid, self.current_epoch)
+        return self.loss(raw[-1], target)
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=2e-3, betas=(0.5, 0.5))
@@ -228,4 +242,4 @@ class Model(pl.LightningModule):
         }
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(DataSet(), batch_size=10)
+        return torch.utils.data.DataLoader(DataSet(image_num=self.image_num), batch_size=self.batch_size)

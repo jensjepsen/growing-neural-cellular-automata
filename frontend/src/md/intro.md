@@ -19,7 +19,7 @@ See my PyTorch implementation of the code here: [Growing CA's](#link-to-repo), o
 ---
 
 <Suspense>
-    <Model :model-file="'salamander.onnx'" />
+    <Model :model-file="'0_pool=True_damage=True_epochs=500.onnx'" />
 </Suspense>
 <Suspense>
     <Model :model-file="'salamander.onnx'" />
@@ -43,23 +43,95 @@ In the case of our CA's, the part of our program that we want to learn, is our u
 
 ### Algorithm
 
-Below you'll find a, slightly fluffy, description of the algorithm that finds an update function for our cells, that will allow a single cell, to grow into an image of our choosing.
+Below, you'll find a (slightly fluffy) description of the algorithm that finds an update function for our cells, that will allow a single cell, to grow into an image of our choosing. The code below is some sort of pseudo-code, with type hints for the tensors (what a world that would be). To see real, working code, please see the [repo](intro.md)
 
 We start with a representation of the state of our system, i.e. of the current state all our cells.
-Each cell represents a pixel in a grid, that should eventually grow into an image of our choosing.
+Each cell represents a pixel in a grid (`40x40`), that should eventually grow into an image of our choosing.
 We represent the state of each cell, a vector composed of it's visible parts and a hidden state. The authors' propose using a state vector of size `16` where the first four pixels represent a the RGBA pixel representation that we will end up seing, and the remaining `12` entries are the hidden, or internal, state of the cell.
 
-```
-TODO: Add code for grid state
+```python
+state: Tensor[40, 40, 16] = zeros() # image height x image width x cell state dimension
+
+state[20, 20, 3:] = 1               # Why are we setting the internal state AND the alpha channel of the middle cell to 1?
+                                    # read on to find out!
 ```
 
-To represent our update function, we turn to everybody's universal and differentiable function approximator, the neural network, which will allow the algorithm to find a suitable update function using gradient descent. The NN is a simple feed forward network that takes as input the state of the cell and it's perception of it's surrounding neighbours.
+The A, in RGBA, or the alpha channel serves a special purpose, apart from it's usual function of designating the opacity of the pixel in the image. The authors also use the alpha channel (`state[cell_x, cell_y, 3]`), to signify the state each cell's life:
+* Cells with `state[cell_x, cell_y, 3] == 0` are dead!
+* Cells with `0 < state[cell_x, cell_y, 3] < 0.1` are growing..
+* And cells with `state[cell_x, cell_y, 3] > 0.1` are fully grown <3
+
+
+```python
+    def whos_alive(state: Tensor[40, 40, 16]) -> Tensor[40, 40, 1]:
+        """
+            Returns an alive mask,
+            where 1.0 represents that the cell at that point on the grid
+            is alive and 0.0 represents that it's dead
+        """"
+        pass
+```
+
+Now we're ready to talk about how the denizens of our colony know what is going on around them. The authors represent the cell's perception of the it's surroundings, as the gradient of neighbouring cell states, along the x and y directions of the grid, likening it to the chemical gradients that a biological cell would perceive from its surrounding environment. We convert the state tensor of our grid, to a perception tensor, by convolving the state tensor with two fixed weight sobel convolutions, and concatenating the two outputs with the cells own state, giving us:
+
+```python
+sobel_x: Tensor[3, 3] = [
+        [-1, 0, 1],
+        [-2, 0, 2],
+        [-1, 0, 1]
+    ]
+
+sobel_y = sobel_x.transpose()
+
+def perceive(state: Tensor[40, 40, 16]) -> Tensor[40, 40, 16 * 3]:
+
+    # Below we convolve our state with a horizontal and a vertical sobel filter.
+    # What this means, in the horizontal case, is that for each cell state state[cell_x, cell_y, :],
+    # we calculate cell_perception_x = state[cell_x - 1, cell_y, :] - state[cell_x + 1, cell_y, :]
+    return concat(
+        conv2d(state, sobel_x), # The vertical gradient of neighbours
+        conv2d(state, sobel_y), # The horizontal gradient 
+        state                   # The cells own state
+    )
+```
+
+To represent the update function, we turn to everybody's favourite differentiable function approximator, the neural network, which will allow the algorithm to find a suitable update function using gradient descent. The NN is a simple feed forward network that takes as input the state of the cell and it's perception of it's surrounding neighbours. To simulate that only some cells update every iteration, we randomly zero out around half of the updates, every update.
+
+```python
+
+network = nn.Sequential(
+    nn.Linear(16 * 3, 128), # Horizontal gradient + vertical gradient + own state
+    nn.ReLU(),
+    nn.Linear(128, 16, bias=False, init=0) # State update delta
+                                           # Note that this layer has no bias
+                                           # And is initialized with zero weights:
+                                           # This makes it default to a NOOP, before we start training it
+)
+
+def whos_alive(state: Tensor[40, 40, 16]):
+    pass
+
+def update(state: Tensor[40, 40, 16]) -> Tensor[40, 40, 16]:
+    """
+    Take a system state at time t, and produce the state for time t+1
+    """
+    perception: Tensor[40, 40, 16 * 3] = perceive(state)
+    state_update_delta = network(perception)
+
+    who_grew: Tensor[40, 40, 1] = random_ones(prob=0.5)
+    
+    updated_state: Tensor[40, 40, 16] = state + state_update_delta * who_grew
+
+    return updated_state * whos_alive(updated_state)
 
 ```
-TODO: Add NN code
+
+Now we have our initial state, a way for our states to perceive their surroundings, and a definition of our update function, and we can implement our training algorithm, to find the parameterization of our update function:
+
+```
+TODO: Add training code
 ```
 
-Describe the perception of the cell 
 
 Describe the training loop
 

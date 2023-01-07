@@ -4,7 +4,9 @@ import { ref, onMounted, Ref, reactive } from 'vue'
 import { run, drawNext, damage } from '../helpers/main'
 
 // Define props
-defineProps<{ modelFile: string }>()
+const props = defineProps<{ modelFile: string }>()
+
+
 
 // Reactive state
 const state = reactive({
@@ -16,7 +18,7 @@ let canvas: Ref<HTMLCanvasElement | null>  = ref(null);
 let context: CanvasRenderingContext2D | null | undefined = undefined;
 
 
-let session = await ort.InferenceSession.create(`./models/salamander.onnx`)
+let session = await ort.InferenceSession.create(`./models/${props.modelFile}`)
 
 
 let click: MouseEvent | null = null
