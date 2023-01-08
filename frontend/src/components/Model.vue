@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, Ref, reactive } from 'vue'
+import { ref, onMounted, Ref, reactive, watch, toRef, defineProps } from 'vue'
 
 import { run, drawNext, damage } from '../helpers/main'
 
 // Define props
-const props = defineProps<{ modelFile: string }>()
-
-
+const props = defineProps({ modelFile: String, title: String })
 
 // Reactive state
 const state = reactive({
@@ -16,18 +14,29 @@ const state = reactive({
 // Refs
 let canvas: Ref<HTMLCanvasElement | null>  = ref(null);
 let context: CanvasRenderingContext2D | null | undefined = undefined;
+let timeoutHandle: number = 0;
 
-
-let session = await ort.InferenceSession.create(`./models/${props.modelFile}`)
-
+watch([toRef(props, 'modelFile')], () => {
+  ort.InferenceSession.create(`./models/${props.modelFile}`).then((session) => {
+    if(canvas.value && context && props.modelFile) {
+      loop(null, session, canvas.value, context, props.modelFile)
+      reset = true
+    }
+  })
+}, {immediate: true})
 
 let click: MouseEvent | null = null
 let reset = false
 
-function loop(cellState: Float32Array | null, session: ort.InferenceSession, canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) {
+function loop(cellState: Float32Array | null, session: ort.InferenceSession, canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, modelFile: string) {
+    if (modelFile !== props.modelFile) {
+      return
+    }
+
     if (reset) {
       reset = false
       cellState = null
+      state.iterations = 0
     }
     cellState = cellState || new Float32Array(1 * 40 * 40 * 16);
     const iters = 1
@@ -41,7 +50,7 @@ function loop(cellState: Float32Array | null, session: ort.InferenceSession, can
         drawNext(
             result.rgb,
             0,
-            () => loop(nextState.data, session, canvas, context),
+            () => loop(nextState.data, session, canvas, context, modelFile),
             canvas,
             context
         )
@@ -58,30 +67,34 @@ function doReset () {
   reset = true
 }
 
+
+
 // Lifecycle hooks
 onMounted(() => {
   context = canvas.value?.getContext('2d')
-  if(canvas.value && context)
-    loop(null, session, canvas.value, context)
 })
 </script>
 
 <template>
-  <div class="container">
-      <div>
+  <div class="model-container">
+      <div class="is-flex is-justify-content-space-around is-size-6"><b>{{ title }}</b></div>
+      <div class="is-flex is-justify-content-space-around">
         <canvas class="canvas" width="40" height="40" ref="canvas" @click="canvasClick">
         </canvas>
       </div>
-      <div>
-        <div class="iters">{{state.iterations}}</div>
-        <button @click="doReset()">reset</button>
+      <div class="is-flex is-flex-direction-row is-justify-content-space-between">
+        <div class="is-size-7 iters is">{{state.iterations}}</div>
+        <button class="button is-small" @click="doReset()">
+          reset
+        </button>
       </div>
   </div>
 </template>
 
 <style scoped>
   .canvas {
-      width: 160px;
-      height: 160px;
+      width: 200px;
+      height: 200px;
+      cursor: pointer;
   }
 </style>

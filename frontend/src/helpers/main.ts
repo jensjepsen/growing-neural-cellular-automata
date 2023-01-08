@@ -44,7 +44,7 @@ function drawNext (rgb: ort.TypedTensor<'uint8'>, step: number, next: CallableFu
     const nextStep = step < rgb.dims[0] - 1 ? step + 1 : 0;
     drawCanvas(rgb, step, canvas, context)
     if (nextStep != 0) {
-        setTimeout(() => drawNext(rgb, nextStep, next, canvas, context), 100)
+        setTimeout(() => drawNext(rgb, nextStep, next, canvas, context), 50)
     } else {
         next()
     }

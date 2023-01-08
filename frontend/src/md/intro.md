@@ -1,49 +1,49 @@
 <script setup lang="ts">
-    import Model from '../components/Model.vue'
+    import Models from '../components/Models.vue'
 </script>
 
-# Growing Neural Cellular Automata
-
+# Reproducing Growing Neural Cellular Automata
+##### By Jens Jepsen
 ---
 
-Christmas is upon us, and that means a short-term migration back to the motherland, and listening to audiobooks in the car.
-The book in question for this years treck was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
-While listening to the chapter on multicellular organisms, I was reminded of a paper I read a while back, and here we are!
+Christmas is upon us, and that means a short-term migration back to the motherland, and listening to audiobooks in the car. The book in question for this years treck was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
+While listening to the chapter on multicellular organisms, I was reminded of a paper I read a while back.
 
-Below is my **reproduction** of the original work of **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson, Michael Levin** in [Growing Neural Cellular Automata](https://distill.pub/2020/growing-ca/). 
-
-In their work, the authors show how to **learn** the update function of a cellullar automata, in such a way, that the cells grow into an arbitrary image, that can regenerate if parts of it are destroyed. Amaze!
+That paper was [Growing Neural Cellular Automata](https://distill.pub/2020/growing-ca/), and below is **my reproduction** of the original work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson, Michael Levin**. 
+In their work, the authors show how to **learn** the update function of a cellullar automata, in such a way, that the cells grow into an arbitrary image, that can regenerate if parts of it are destroyed. Amazing!
 
 See my PyTorch implementation of the code here: [Growing CA's](#link-to-repo), or play around with the some of the automata below!
 
 ---
+*Hint: Click the images to interact with them!*
 
-<Suspense>
-    <Model :model-file="'0_pool=True_damage=True_epochs=500.onnx'" />
-</Suspense>
-<Suspense>
-    <Model :model-file="'salamander.onnx'" />
-</Suspense>
+<Models></Models>
 
 ---
 
+### Intro
+In the paper the authors propose an algorithm for learning the update function of a cellular automata, in such a way that a single progenitor cell, can grow into a predefined target image, after a fixed time of evolution.
+
+The update function learned in this first experiment, will make the system keep growing, and thus if the system is allowed to keep growing, it starts to diverge from the original image.
+
+In their next experiment, they show how to modify the training procedure to learn a function that results in the system converging to a steady state, irrespective of how long we let it evolve.
+
+Next, they show how to make the system robust to sporadic damage to parts of it, making it able to regrow parts of itself, if cells are removed.
 ### Cellular automata
 In it's simplest form, a Cellular Automaton is a discrete model of cells, that reside on a discrete grid, where each point on the grid, corresponds to a cell. Each cell has an internal state, that is iteratively updated, by the application of an update function, that takes as input the current state of the cell and it's immediate neighbours, to produce the next state of each cell.
 
-Depending on the update function of the cell, and the initial conditions, vastly different behaviours of the overall system, i.e. the total grid of cells, will emerge over time. We can think about the update function as the genotype of the cell, and the resulting state of the cell as the phenotype of the cell, or it's particular expression, given it's environment and external stimuli. Following this analogy, we can think of the state of the system, as the phenotype of a multicellular organism.
+Depending on the update function of the cell, and the initial conditions, vastly different behaviours of the overall system, i.e. the total grid of cells, will emerge over time. We can think about the update function as the genotype of the cell, and the resulting state of the cell as the phenotype of the cell, or it's particular expression, given it's environment. Following this analogy, we can think of the state of the system, as the phenotype of a multicellular organism.
 
 We can use CA's to model physical phenomena, such as diffusion of particles. In that case, we know the behaviour of each  cell (or particle), but not the resultant emerging behaviour of the entire system, and we can write the rules by hand.
 But what if we the converse is the case: We know the final state of the system, but not the rules (the update function) that govern the individual cells? That's the question the authors answer in the original article, and what leads us to the next topic.
 
-### Differentiable programming
+To allow the algorithm to learn the update function using gradient descent, or the like, we can use differentiable programming. Differentiable programming is a programming paradigm where we substitute parts of our program by parameterized differentiable functions. Since the parts are differentiable, we can use gradient descent to find parameters that make our program minimize (or maximize) some differentiable loss function. 
 
-A (very) quick primer: Differentiable programming is a programming paradigm where we substitute parts of our program by parameterized differentiable functions. Since the parts are differentiable, we can use gradient descent to find parameters that make our program minimize (or maximize) some differentiable loss function. 
-
-In the case of our CA's, the part of our program that we want to learn, is our update function, and our loss function that we want to minimize, is a function that measures the difference between the total state of our system (our arrangement of cells on our grid), that our program actually produces, and the state that we want it to produce.
+In the case of our CA's, the part of our program that we want to learn, is our update function, and our loss function that we want to minimize, is a function that measures the difference between the state that our system has evolved to (our arrangement of cells on our grid), and the state that we want it to produce, our target image.
 
 ### Algorithm
 
-Below, you'll find a (slightly fluffy) description of the algorithm that finds an update function for our cells, that will allow a single cell, to grow into an image of our choosing. The code below is some sort of pseudo-code, with type hints for the tensors (what a world that would be). To see real, working code, please see the [repo](intro.md)
+Below, you'll find a (slightly fluffy) description of the algorithm that finds an update function for our cells, that will allow a single cell, to grow into an image of our choosing. The code below is **definitely pseudo-code**, with type hints for the tensors (what a world that would be). **To see real, working code**, please see [the repo with my PyTorch implementation](intro.md)
 
 We start with a representation of the state of our system, i.e. of the current state all our cells.
 Each cell represents a pixel in a grid (`40x40`), that should eventually grow into an image of our choosing.
@@ -63,13 +63,13 @@ The A, in RGBA, or the alpha channel serves a special purpose, apart from it's u
 
 
 ```python
-    def whos_alive(state: Tensor[40, 40, 16]) -> Tensor[40, 40, 1]:
-        """
-            Returns an alive mask,
-            where 1.0 represents that the cell at that point on the grid
-            is alive and 0.0 represents that it's dead
-        """"
-        pass
+def whos_alive(state: Tensor[40, 40, 16]) -> Tensor[40, 40, 1]:
+    """
+        Returns an alive mask,
+        where 1.0 represents that the cell at that point on the grid
+        is alive and 0.0 represents that it's dead
+    """ 
+    pass
 ```
 
 Now we're ready to talk about how the denizens of our colony know what is going on around them. The authors represent the cell's perception of the it's surroundings, as the gradient of neighbouring cell states, along the x and y directions of the grid, likening it to the chemical gradients that a biological cell would perceive from its surrounding environment. We convert the state tensor of our grid, to a perception tensor, by convolving the state tensor with two fixed weight sobel convolutions, and concatenating the two outputs with the cells own state, giving us:
@@ -99,17 +99,15 @@ To represent the update function, we turn to everybody's favourite differentiabl
 
 ```python
 
-network = nn.Sequential(
+# NN to produce the state update delta
+network: NeuralNetwork = nn.Sequential(
     nn.Linear(16 * 3, 128), # Horizontal gradient + vertical gradient + own state
     nn.ReLU(),
-    nn.Linear(128, 16, bias=False, init=0) # State update delta
-                                           # Note that this layer has no bias
-                                           # And is initialized with zero weights:
-                                           # This makes it default to a NOOP, before we start training it
+    # Note that the last layer has no bias
+    # And is initialized with zero weights:
+    # This makes it default to a NOOP, before we start training it
+    nn.Linear(128, 16, bias=False, init=0) 
 )
-
-def whos_alive(state: Tensor[40, 40, 16]):
-    pass
 
 def update(state: Tensor[40, 40, 16]) -> Tensor[40, 40, 16]:
     """
@@ -126,14 +124,45 @@ def update(state: Tensor[40, 40, 16]) -> Tensor[40, 40, 16]:
 
 ```
 
-Now we have our initial state, a way for our states to perceive their surroundings, and a definition of our update function, and we can implement our training algorithm, to find the parameterization of our update function:
+With all these parts in place, we're define a function that'll let our cell colony evolve:
 
+```python
+def evolve(evolution_steps: int) -> Tensor[40, 40, 16]:
+    state: Tensor[40, 40, 16] = zeros() # image height x image width x cell state dimension
+    state[20, 20, 3:] = 1 # Initialize center cell 
+    states = [state] # Keep a list of all state, so we can see the evolution over our states
+    for update_step in range(evolution_steps):
+        state = update(state) # Evolve to next step
+        states.append(state)  # Keep step for posterity (and loss!)
+    return states
 ```
-TODO: Add training code
+
+Now we have our initial state, a way for our states to perceive their surroundings, a definition of our update function and a way for our cells to evolve, and we can implement our training algorithm, to find the parameterization of our update function:
+
+
+```python
+def train(target_image: Tensor[40, 40, 4], iterations: int):
+    """
+        This function will train our neural network,
+        such that it converges to an update function
+        that causes the evolution of our colony of cells
+        to converge to the target image
+    """
+    for _ in range(iterations):
+        evolution_steps: int = uniform_int(64, 92)
+        evolution_states = evolve(evolution_steps)
+        final_state = evolution_states[-1]
+        
+        # Calculate the MSE (mean squared error)
+        # between the RGBA channels of our final state and our target image,
+        # after between 64 and 92 update steps
+        loss = ((final_state[0:4] - target_image) ** 2).mean()
+
+        # Use loss to update NN weights,
+        # using the Adam optimizer
+        # (see hyperparameters in the real code in repo)
+        update_nn_weights_using_adam(network, loss)
 ```
-
-
-Describe the training loop
 
 Describe homeostatis training
 
@@ -143,22 +172,4 @@ Describe regen training
 
 
 
-
-We represent our 
-
-
-Below is the central part of the algorithm:
-
-
-
-TODO: Add mathematical/programattic definition of model, i.e. update function + initial state
-
-TODO: Add pseudo code for algorithm
-
 TODO: Write about homeostatis
-
-* Loop until training loss is suffiently low
-  * Let **S** be the initial state of our cells, as a tensor grid of cells **H x W x Cell State Dimension**
-  * Set **S[H/2, W/2, :] = 1**, simulating one living cell in the initial state, in the center of the image
-  * For **k** ~ **uniform(64, 92)** steps
-    * 
