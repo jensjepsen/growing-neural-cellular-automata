@@ -242,4 +242,4 @@ class Model(pl.LightningModule):
         }
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(DataSet(image_num=self.image_num), batch_size=self.batch_size)
+        return torch.utils.data.DataLoader(DataSet(image_num=self.image_num), batch_size=self.batch_size, num_workers=0)
