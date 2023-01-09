@@ -24,13 +24,13 @@ const state = reactive({
         </div>
         <div class="columns is-justify-content-space-around">
             <Suspense>
-                <Model :title="'regenerating'" class="is-flex-grow-0 column" :model-file="state.selected + '_pool=True_damage=True_epochs=500.onnx'" />
+                <Model :title="'regenerating'" class="is-flex-grow-0 column" :model-file="state.selected + '_pool=True_damage=True_epochs=1000.onnx'" />
             </Suspense>
             <Suspense>
-                <Model :title="'stable'" class="is-flex-grow-0 column" :model-file="state.selected + '_pool=True_damage=False_epochs=500.onnx'" />
+                <Model :title="'stable'" class="is-flex-grow-0 column" :model-file="state.selected + '_pool=True_damage=False_epochs=1000.onnx'" />
             </Suspense>
             <Suspense>
-                <Model :title="'growing'" class="is-flex-grow-0 column" :model-file="state.selected + '_pool=False_damage=False_epochs=500.onnx'" />
+                <Model :title="'growing'" class="is-flex-grow-0 column" :model-file="state.selected + '_pool=False_damage=False_epochs=1000.onnx'" />
             </Suspense>
         </div>
     </div>
