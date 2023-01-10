@@ -22,20 +22,30 @@ See my PyTorch implementation of the algorithm and how I deploy the trained auto
 ---
 
 ### Intro
-In the paper the authors propose an algorithm for learning the update function of a cellular automata, in such a way that a single progenitor cell, can grow into a predefined target image, after a fixed time of evolution.
+In the paper the authors propose an algorithm for learning the update function of a cellular automata, in the form of a neural network, in such a way that a single progenitor cell, can grow into a predefined target image, after a fixed time of evolution.
 
-The update function learned in this first experiment, will make the system keep growing, and thus if the system is allowed to keep growing, it starts to diverge from the original image.
+The basic algorithm proceeds by iteratively doing the following:
+* Evolve the grid of cells using the current neural network update function
+* Calculate the difference between the visible part of evolved state and a target image
+* Adjust the weights of the neural network, using gradient descent, in such a way way that the next evolution of will be closer
+* Repeat!
 
-In their next experiment, they show how to modify the training procedure to learn a function that results in the system converging to a steady state, irrespective of how long we let it evolve.
+The authors perform four experiments:
 
-Next, they show how to make the system robust to sporadic damage to parts of it, making it able to regrow parts of itself, if cells are removed.
+* Learn an update function that will make the system grow into the target image, after k timesteps, where k is a randomly sampled integer drawn from a uniform distribution. If this experiment is allowed to keep growing, it starts to diverge from the original image, as you can see above on the automata labelled **growing**.
+
+* Modify the training procedure to learn a function that results in the system converging to a steady state, irrespective of how long we let it evolve. See **stable**, above.
+
+* Further adjust the training procedure, to make the system robust to sporadic damage and enabling it to regrow parts of itself, if cells are removed. This is the coolest one - see it above under **regenerating**.
+
+* TODO: Rotation
 
 ### Cellular automata
-In it's simplest form, a Cellular Automaton is a discrete model of cells, that reside on a discrete grid, where each point on the grid, corresponds to a cell. Each cell has an internal state, that is iteratively updated, by the application of an update function, that takes as input the current state of the cell and it's immediate neighbours, to produce the next state of each cell.
+In it's simplest form, a Cellular Automaton is a discrete model of cells, that reside on a discrete grid, where each point on the grid corresponds to a cell. Each cell has an internal state, that is iteratively updated, by the application of an update function that takes as input the current state of the cell and it's immediate neighbours, to produce the next state of each cell.
 
 Depending on the update function of the cell, and the initial conditions, vastly different behaviours of the overall system, i.e. the total grid of cells, will emerge over time. We can think about the update function as the genotype of the cell, and the resulting state of the cell as the phenotype of the cell, or it's particular expression, given it's environment. Following this analogy, we can think of the state of the system, as the phenotype of a multicellular organism.
 
-We can use CA's to model physical phenomena, such as diffusion of particles. In that case, we know the behaviour of each  cell (or particle), but not the resultant emerging behaviour of the entire system, and we can write the rules by hand.
+We can use CA's to model physical phenomena, such as diffusion of particles. In that case, we know the behaviour of each  cell (or particle), but not the resultant emergent behaviour of the entire system, and we can write the rules by hand.
 But what if we the converse is the case: We know the final state of the system, but not the rules (the update function) that govern the individual cells? That's the question the authors answer in the original article, and what leads us to the next topic.
 
 To allow the algorithm to learn the update function using gradient descent, or the like, we can use differentiable programming. Differentiable programming is a programming paradigm where we substitute parts of our program by parameterized differentiable functions. Since the parts are differentiable, we can use gradient descent to find parameters that make our program minimize (or maximize) some differentiable loss function. 
@@ -46,58 +56,70 @@ In the case of our CA's, the part of our program that we want to learn, is our u
 
 Below, you'll find a (slightly fluffy) description of the algorithm that finds an update function for our cells, that will allow a single cell, to grow into an image of our choosing. **To see real, working code**, please see [the repo with my PyTorch implementation](intro.md).
 
-The authors `40x40` images of emojis, and we'll do the same here!
+The authors use `40x40` images of emojis, and we'll do the same here!
 
-Let's start with the algorithm to evolve our system over time:
+Let's start with the algorithm to evolve our system over time. This procedure remains the same over all the experiments.
+Please note, that in practice, we'll be evolving a batch of cell grids in every iteration, instead of just one, to stabilize the training produce. In the pseudo-code we mostly pretend that we'll just be evolving a single grid at a time.
 
 ```python
-def evolve(timesteps):
+def evolve(timesteps: int, initial_state: Tensor[40, 40, 16], neural_network: NeuralNetwork):
     """
-    Initialize our state grid, where each point in the grid is a vector with the cell state
-    We interpret the first four elements of the vector as an RGBA pixel,
-    allowing us to evolve our image.
-    We initialize the center cell's state vector as [0, 0, 0, 1, ..., 1],
-    Note that we let the A of our pixel representation be 1.
+    This function takes an initial state,
+    and a neural network that represents our update function,
+    and evolves the state of cells on the grid for a number of timesteps.
     """
-    # image height x image width x cell state
-    state_grid: Tensor[40, 40, 16] = init_grid()
+    
 
+    """
+    Our initial state is a 40x40 grid,
+    where each point on the grid is a 16 dimensional vector that represents the cell state.
+    The first 4 elements of the vector are the components of an RGBA pixel, 
+    and the last 12 are the cells internal state.
+    """
+    state_grid: Tensor[40, 40, 16] = intial_state.copy()
     for t from range(0, timesteps):
         """
-        We start by selecting only the cells that are alive):
-        cells with an A value
-           = 0 are dead
-           < 0.1 are growing
-           > 0.1 are fully grown
-        Remember that we initialized 1 cell to have an A of 1, in our initial state,
-        which means that that's the only cell that starts out being alive.
+        The fourth element of a cells state,
+        or the A channel of the RGBA pixel, has a special significance,
+        apart from denoting the opacity of the pixel.
+        We also use it to denote the lifecycle of a cell.
+        This leads to the following rule for a cell's lifecycle:
+           state_grid[:, :, 3] = 0, dead
+           0 < state_grid[:, :, 3] = < 0.1, growing
+           state_grid[:, :, 3] > 0.1, mature
+
+        We first select the cells who are mature themselves,
+        or that have neighbours that are:
         """
-        alive = mask_alive(state_grid)
+        alive = select_where(state_grid, max_pool_2d(state_grid, kernel_size=(3, 3)) > 0.1)
 
         """
-        Next, we calculate the perception of each cell
-        The authors liken this perception of differences, 
+        Next, we calculate the perception of each cell,
+        as the gradient along the vertical and horizontal axis of the grid,
+        concatenated with the cell's own internal state.
+        The authors liken this perception of gradients, or differences, 
         to a biological cell being aware of chemical gradients in it's environment. 
         """
         perception: Tensor[40, 40, 16 * 3] = concat(
             state_grid,
-            horizontal_gradient(state_grid), # cell_state[x-1, y] - cell_state[x+1, y]
-            vertical_gradient(state_grid)    # cell_state[x, y-1] - cell_state[x, y+1]
+            horizontal_gradient(alive), # cell_state[x-1, y] - cell_state[x+1, y]
+            vertical_gradient(alive)    # cell_state[x, y-1] - cell_state[x, y+1]
         )
 
         """
         Now, we calculate the update delta for all our cells.
         The function that calculates our update delta,
-        is a neural network, which means we'll be able to train or learn
-        the update function. More on that in a minute.
+        is a neural network, which means we'll be able to train, or learn,
+        the update function, adjusting it's parameters to minimize a loss.
+        More on that in a minute.
         """
         state_update_delta: Tensor[40, 40, 16] = neural_network(perception)
 
         """
-        Now we're ready to calculate the new state of our system,
+        Finally, we calculate the new state of our system,
         by adding our update delta to the state at t-1.
         To simulate that not all cells grow at the same time,
-        we randomly zero out vectors in our update delta with probability 0.5,
+        we randomly zero out cell state vectors in our update delta with probability 0.5,
         which means that, on average, half of our cells will update at every timestep.
         """
         state_grid: Tensor[40, 40, 16] = state_grid + randomly_zero_out_states(state_update_delta, prob=0.5)
@@ -106,35 +128,71 @@ def evolve(timesteps):
 
 ```
 
-Now we have our initial state, a way for our states to perceive their surroundings, a definition of our update function and a way for our cells to evolve, and we can implement our training algorithm, to find the parameterization of our update function:
-
+Now we move to the training procedure, where we train the neural neural network to learn the update function the we want:
 
 ```python
-def train(target_image: Tensor[40, 40, 4], iterations: int):
+def train(target_image: Tensor[40, 40, 4], iterations: int, network: NeuralNetwork):
     """
-        This function will train our neural network,
-        such that it converges to an update function
-        that causes the evolution of our colony of cells
-        to converge to the target image
+    This function will train our neural network,
+    such that it converges to an update function
+    that causes the evolution of our colony of cells
+    to converge to the target image.
     """
+
+    """
+    We start by initializing our grid
+    to only have a single living cell, in the center.
+    """
+    # image height x image width x cell state
+    state_grid: Tensor[40, 40, 16] = init_grid(only_center_cell_alive=True)
+
+
     for _ in range(iterations):
-        evolution_steps: int = uniform_int(64, 92)
-        evolution_states = evolve(evolution_steps)
-        final_state = evolution_states[-1]
-        
         """
-        Calculate the MSE (mean squared error)
+        In each iteration of this loop,
+        we evolve the state for k ~ uniform(64, 92) timesteps,
+        and compare the visible part of the final state
+        to the image we want it to produce.
+        """
+        
+        evolution_steps: int = uniform_int(64, 92)
+
+        final_state = evolve(evolution_steps, neural_network)
+        
+        visible_state = final_state[:, :, 0:4]
+
+        """
+        Calculate the mean squared error
         between the RGBA channels of our final state and our target image,
         after between 64 and 92 update steps
         """
-        loss = ((final_state[0:4] - target_image) ** 2).mean()
+        loss = ((visible_state - target_image) ** 2).mean() / 2
 
         """
-        Use loss to update NN weights,
-        using the Adam optimizer
-        (see hyperparameters in the real code in repo)
+        Update NN weights,
+        in the direction that minimizes our the difference between the
+        evolved state, and our target image.
         """
-        update_nn_weights_using_adam(network, loss)
+        update_nn_weights(network, loss)
+```
+
+The training procedure described by the pseudo-code above, implements the first experiment, and forms the basis of the basis of the next experiments.
+As you can see above under **growing** this system starts devolving, for most of the images, if we let it run long enough. For some of the images, such as the spiderweb, it continues building of the previous pattern, which looks pretty cool. But for some of the others, it quickly turns scary! 
+
+To learn an update function that converges to a steady-state, we can modify the training procedure slightly. Instead of always letting the system evolve from the same fixed state, we maintain a pool of previously observed states, and sample an initial state from that pool, at each iteration, to use as our initial condition.
+
+```python
+sample_pool = PoolOfTensors(capacity=1024)
+
+def init_grid(batch_size):
+    """
+        Notice that we use a batch size here.
+        We've glossed over the fact that.
+    """
+    intial_states = sample_pool.sample()
+
+    #
+
 ```
 
 Describe homeostatis training
