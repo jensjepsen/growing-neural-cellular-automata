@@ -164,7 +164,8 @@ class Model(pl.LightningModule):
                 input_shape: typing.Tuple[int, int]=(40, 40),
                 damage_num: int=3,
                 image_num: int=0,
-                batch_size: int=10
+                batch_size: int=10,
+                data_points_per_epoch: int=100
             ) -> None:
         super().__init__()
         self.cell: Cell = torch.jit.script(Cell())
@@ -176,6 +177,7 @@ class Model(pl.LightningModule):
         self.damage_num = damage_num
         self.image_num = image_num
         self.batch_size = batch_size
+        self.data_points_per_epoch = data_points_per_epoch
 
         if use_pool:
             self.register_buffer('pool', self.cell.initial_state.expand(1024, self.cell.input_shape[0], self.cell.input_shape[1], self.cell.cell_state_dimension).clone())
@@ -236,4 +238,8 @@ class Model(pl.LightningModule):
         }
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(datasets.DataSet(image_num=self.image_num), batch_size=self.batch_size, num_workers=0)
+        return torch.utils.data.DataLoader(
+            datasets.DataSet(image_num=self.image_num, length=self.data_points_per_epoch),
+            batch_size=self.batch_size,
+            num_workers=0
+        )
