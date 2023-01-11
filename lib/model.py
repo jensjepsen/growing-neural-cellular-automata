@@ -1,7 +1,18 @@
-import torch, torch.nn as nn, torch.optim as optim, torch.nn.functional as F, pytorch_lightning as pl, PIL.Image, numpy as np, torch.utils.data, torchvision.utils
-import typing
+import \
+    torch, \
+    torch.nn as nn, \
+    torch.optim as optim, \
+    torch.nn.functional as F, \
+    pytorch_lightning as pl, \
+    PIL.Image, \
+    numpy as np, \
+    torch.utils.data, \
+    typing
 
-from lib.damage import damage_mask
+from lib import (
+    damage,
+    datasets
+)
 
 class Cell(nn.Module):
     """
@@ -31,7 +42,6 @@ class Cell(nn.Module):
 
         # A fixed initial state, from which all others will evolve :O
         # we set the alpha and hidden state of cell at the center of the grid to all ones
-        #self.initial_state = torch.zeros([*input_shape, cell_state_dimension], dtype=torch.float32)
         
         self.register_buffer('initial_state', torch.zeros([*input_shape, cell_state_dimension], dtype=torch.float32))
         self.initial_state[input_shape[0] // 2, input_shape[1] // 2, 3:] = torch.tensor([1.0] * (cell_state_dimension - 3))
@@ -51,7 +61,6 @@ class Cell(nn.Module):
         # cell_perception_dim -> cell_state
         self.state_update_rule = nn.Sequential(
             nn.Linear(3 * cell_state_dimension, update_rule_hidden_dim),
-            #nn.LayerNorm(update_rule_hidden_dim),
             nn.ReLU(),
             nn.Linear(update_rule_hidden_dim, cell_state_dimension, bias=False),
         )
@@ -92,17 +101,20 @@ class Cell(nn.Module):
         masked_grid = state_grid * alive_mask
         perception = self.perceive(masked_grid)
                 
-        flat_perception = perception #.reshape(-1, self.cell_state_dimension * 3)
+        flat_perception = perception 
         update: torch.Tensor = self.state_update_rule(flat_perception)
         
-        # Do probabilistic update,
-        # to simulate that cells update at different times
-        mask = ((torch.rand(update.shape[0], self.input_shape[0], self.input_shape[1]) > self.update_probability) * 1.0).unsqueeze(-1).to(state_grid.device)
+        # Do probabilistic update to simulate that cells update at different times
+        mask = (
+            (
+                torch.rand(update.shape[0], self.input_shape[0], self.input_shape[1]) > self.update_probability
+            ) * 1.0
+        ).unsqueeze(-1).to(state_grid.device)
         
         update = (
             update
             * mask
-        ) #.view(*(*perception.shape[:-1], update.shape[-1]))
+        )
         
         new_state = state_grid + update
         alive_mask = self.get_alive_mask(new_state)
@@ -142,20 +154,6 @@ class ONNXWrapper(nn.Module):
             rgb, states = self.cell(steps[0], batch_size[0], state)
             last_state = states[-1]
             return rgb, last_state
-
-class DataSet(torch.utils.data.Dataset):
-    def __init__(self, image_num: int=0) -> None:
-        super().__init__()
-        with PIL.Image.open('images/emoji.png') as im:
-            im = np.array(im)
-        self.image = torch.tensor(im / 255.0, dtype=torch.float32)[:, 0 + 40*image_num:40 * (image_num + 1), :]
-            
-    
-    def __getitem__(self, idx):
-        return self.image
-    
-    def __len__(self):
-        return 100
 
 
 class Model(pl.LightningModule):
@@ -216,7 +214,7 @@ class Model(pl.LightningModule):
                 
                 initial_state[0] = self.cell.initial_state
                 if self.use_damage:
-                    mask = damage_mask(self.damage_num, self.input_shape[0], self.input_shape[1]).unsqueeze(-1).to(self.device)
+                    mask = damage.damage_mask(self.damage_num, self.input_shape[0], self.input_shape[1]).unsqueeze(-1).to(self.device)
                     initial_state[-self.damage_num:] = initial_state[-self.damage_num:] * mask
 
             else:
@@ -228,10 +226,6 @@ class Model(pl.LightningModule):
             if self.use_pool:
                 self.pool[sorted_pool_idxs] = raw[-1].detach()
 
-        #if batch_idx % 5 == 0:
-        #    grid = torchvision.utils.make_grid(output[-1].permute(0, 3, 1, 2))
-            
-        #    self.logger.experiment.add_image('test', grid, self.current_epoch)
         return self.loss(raw[-1], target)
 
     def configure_optimizers(self):
@@ -242,4 +236,4 @@ class Model(pl.LightningModule):
         }
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(DataSet(image_num=self.image_num), batch_size=self.batch_size, num_workers=0)
+        return torch.utils.data.DataLoader(datasets.DataSet(image_num=self.image_num), batch_size=self.batch_size, num_workers=0)
