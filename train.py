@@ -1,5 +1,5 @@
-import os, typer, pytorch_lightning as pl, torch
-import model
+import typer, pytorch_lightning as pl, torch
+import lib.model as model
 
 app = typer.Typer()
 
