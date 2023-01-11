@@ -4,7 +4,6 @@ import \
     torch.optim as optim, \
     torch.nn.functional as F, \
     pytorch_lightning as pl, \
-    PIL.Image, \
     numpy as np, \
     torch.utils.data, \
     typing
