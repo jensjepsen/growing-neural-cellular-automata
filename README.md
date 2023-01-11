@@ -4,8 +4,8 @@ This repository contains code to reproduce the work by **Alexander Mordvintsev, 
 ](https://distill.pub/2020/growing-ca/).
 
 The repo consists of two parts:
-* The code to train the models and export them to ONNX
-* A frontend to interact with the trained models
+* PyTorch code to train the models and export them to ONNX
+* A frontend in VueJS+TypeScript to serve and interact with the exported ONNX models, entirely in the browser.
 
 ## Training models
 Setup venv and install requirements:
