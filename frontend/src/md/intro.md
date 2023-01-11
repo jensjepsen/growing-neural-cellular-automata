@@ -181,26 +181,36 @@ As you can see above under **growing** this system starts devolving, for most of
 
 To learn an update function that converges to a steady-state, we can modify the training procedure slightly. Instead of always letting the system evolve from the same fixed state, we maintain a pool of previously observed states, and sample an initial state from that pool, at each iteration, to use as our initial condition.
 
+*Note: In practice, when doing batch training, we sample k previous states, and sort them in descending order of loss. The state sampled state with the highest loss is then replaced with the single cell intitial state from above. The authors note that this is needed to stabilize training. But let's ignore that fact here, to make my life easier.*
+
 ```python
 sample_pool = PoolOfTensors(capacity=1024)
 
-def init_grid(batch_size):
-    """
-        Notice that we use a batch size here.
-        We've glossed over the fact that.
-    """
-    intial_states = sample_pool.sample()
+def init_grid_from_pool(batch_size):
+    return sample_pool.sample()
 
-    #
 
+
+def train(target_image: Tensor[40, 40, 4], iterations: int, network: NeuralNetwork):
+    """
+        We update the training function to sample from the pool,
+        and store states in the pool for later use.
+    """
+    state_grid: Tensor[40, 40, 16] = init_grid_from_pool()
+
+    for _ in range(iterations):
+        evolution_steps: int = uniform_int(64, 92)
+        final_state = evolve(evolution_steps, neural_network)
+
+        """
+        We add the final state to the sample pool here.
+        Everything else remains unchanged.
+        """
+        sample_pool.add(final_state)
+
+        visible_state = final_state[:, :, 0:4]
+        loss = ((visible_state - target_image) ** 2).mean() / 2
+        update_nn_weights(network, loss)
 ```
 
-Describe homeostatis training
-
-Describe regen training
-
-
-
-
-
-TODO: Write about homeostatis
+TODO: Describe regen training
