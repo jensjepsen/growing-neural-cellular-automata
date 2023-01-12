@@ -3,7 +3,7 @@
 </script>
 
 ## Reproducing Growing Neural Cellular Automata
-##### By Jens Jepsen
+###### By Jens Jepsen
 ---
 
 Below is **my reproduction** of the original work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson, Michael Levin**, in [Growing Neural Cellular Automata](https://distill.pub/2020/growing-ca/). 
