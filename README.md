@@ -2,8 +2,7 @@
 
 Play around with the trained models and read about the alorithms at [Reproducing Growing Neural Cellular Automata](https://jensjepsen.github.io/growing-neural-cellular-automata/).
 
-This repository contains code to reproduce the work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson and Michael Levin**, which can be found at [Growing Neural Cellular Automata
-](https://distill.pub/2020/growing-ca/).
+This repository contains code to reproduce the work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson and Michael Levin**, which can be found [here](https://distill.pub/2020/growing-ca/).
 
 
 The repo consists of two parts:
