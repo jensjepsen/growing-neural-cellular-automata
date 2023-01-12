@@ -6,13 +6,10 @@
 ##### By Jens Jepsen
 ---
 
-Christmas is upon us, and that means a short-term migration back to the motherland, and listening to audiobooks in the car. The book in question for this years treck was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
-While listening to the chapter on multicellular organisms, I was reminded of a paper I read a while back.
-
-That paper was [Growing Neural Cellular Automata](https://distill.pub/2020/growing-ca/), and below is **my reproduction** of the original work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson, Michael Levin**. 
+Below is **my reproduction** of the original work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson, Michael Levin**, in [Growing Neural Cellular Automata](https://distill.pub/2020/growing-ca/). 
 In their work, the authors show how to **learn** the update function of a cellullar automata, in such a way, that the cells grow into an arbitrary image, that can regenerate if parts of it are destroyed. Amazing!
 
-See my PyTorch implementation of the algorithm and how I deploy the trained automata using ONNX and TypeScript here: [Growing and deploying CA's](https://github.com/jensjepsen/growing-neural-cellular-automata), or play around with the some interactive automata below, to see what all the fuss is about!
+See my PyTorch implementation of the algorithm and how I deploy the trained automata using ONNX and TypeScript here: [Growing and deploying CA's](https://github.com/jensjepsen/growing-neural-cellular-automata), or play around with the interactive automata below, to see what all the fuss is about!
 
 ---
 *Hint: Click the images to interact with them!*
@@ -22,6 +19,10 @@ See my PyTorch implementation of the algorithm and how I deploy the trained auto
 ---
 
 ### Intro
+
+Christmas is upon us, and that means a short-term migration back to the motherland, and listening to audiobooks in the car. The book in question for this years treck was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
+While listening to the chapter on multicellular organisms, I was reminded of the article, that I read a while back.
+
 In the paper the authors propose an algorithm for learning the update function of a cellular automata, in the form of a neural network, in such a way that a single progenitor cell, can grow into a predefined target image, after a fixed time of evolution.
 
 The basic algorithm proceeds by iteratively doing the following:
