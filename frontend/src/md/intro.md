@@ -9,7 +9,7 @@
 Below is **my reproduction** of the original work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson, Michael Levin**, in [Growing Neural Cellular Automata](https://distill.pub/2020/growing-ca/). 
 In their work, the authors show how to **learn** the update function of a cellullar automata, in such a way, that the cells grow into an arbitrary image, that can regenerate if parts of it are destroyed. Amazing!
 
-See my PyTorch implementation of the algorithm and how I deploy the trained automata using ONNX and TypeScript here: [Growing and deploying CA's](https://github.com/jensjepsen/growing-neural-cellular-automata), or play around with the interactive automata below, to see what all the fuss is about!
+See my PyTorch implementation and how I deploy the trained automata using ONNX, here: [Growing and deploying CA's](https://github.com/jensjepsen/growing-neural-cellular-automata), or play around with the interactive automata below, to see what all the fuss is about!
 
 ---
 *Hint: Click the images to interact with them!*
