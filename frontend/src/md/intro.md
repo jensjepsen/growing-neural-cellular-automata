@@ -20,7 +20,7 @@ See my PyTorch implementation of the algorithm and how I deploy the trained auto
 
 ### Intro
 
-Christmas is upon us, and that means a short-term migration back to the motherland, and listening to audiobooks in the car. The book in question for this years treck was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
+Christmas is upon us (or, was recently), and that means a short-term migration back to the motherland, and listening to audiobooks in the car. The book in question for this years treck was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
 While listening to the chapter on multicellular organisms, I was reminded of the article, that I read a while back.
 
 In the paper the authors propose an algorithm for learning the update function of a cellular automata, in the form of a neural network, in such a way that a single progenitor cell, can grow into a predefined target image, after a fixed time of evolution.
