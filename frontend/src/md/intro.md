@@ -12,9 +12,10 @@ In their work, the authors show how to **learn** the update function of a cellul
 See my PyTorch implementation and how I deploy the trained automata using ONNX, here: [Growing and deploying CA's](https://github.com/jensjepsen/growing-neural-cellular-automata). Or, even better, play around with the interactive automata below, to see what all the fuss is about!
 
 ---
-*Hint: Click the images to interact with them!*
 
 <Models></Models>
+
+*Hint: Click the images to interact with them!*
 
 ---
 
