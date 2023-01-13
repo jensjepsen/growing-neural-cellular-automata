@@ -7,7 +7,7 @@
 ---
 
 Below is **my reproduction** of the original work by **Alexander Mordvintsev, Ettore Randazzo, Eyvind Niklasson, Michael Levin**, in [Growing Neural Cellular Automata](https://distill.pub/2020/growing-ca/). 
-In their work, the authors show how to **learn** the update function of a cellullar automata, in such a way, that the cells grow into an arbitrary image, that can regenerate if parts of it are destroyed. Amazing!
+In their work, the authors show how to **learn** the update function of a cellular automata, in such a way, that the cells grow into an arbitrary image, that can regenerate if parts of it are destroyed. Amazing!
 
 See my PyTorch implementation and how I deploy the trained automata using ONNX, here: [Growing and deploying CA's](https://github.com/jensjepsen/growing-neural-cellular-automata). Or, even better, play around with the interactive automata below, to see what all the fuss is about!
 
@@ -21,7 +21,7 @@ See my PyTorch implementation and how I deploy the trained automata using ONNX, 
 
 ### Intro
 
-Christmas is upon us (or, was recently), and that means a short-term migration back to the motherland, and listening to audiobooks in the car. The book in question for this years treck was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
+Christmas is upon us (or, was recently), and that means a short-term migration back to the motherland, and listening to audiobooks in the car. The book in question for this years trek was [Song of the Cell](https://www.amazon.com/Song-Cell-Exploration-Medicine-Human/dp/1982117354) (a great book about cell biology and the human body).
 While listening to the chapter on multicellular organisms, I was reminded of the article, that I read a while back.
 
 In the paper the authors propose an algorithm for learning the update function of a cellular automata, in the form of a neural network, in such a way that a single progenitor cell, can grow into a predefined target image, after a fixed time of evolution.
@@ -43,12 +43,12 @@ The authors perform four experiments:
 * TODO: Rotation
 
 ### Cellular automata
-In it's simplest form, a Cellular Automaton is a discrete model of cells, that reside on a discrete grid, where each point on the grid corresponds to a cell. Each cell has an internal state, that is iteratively updated, by the application of an update function that takes as input the current state of the cell and it's immediate neighbours, to produce the next state of each cell.
+In it's simplest form, a Cellular Automaton is a discrete model of cells, that reside on a discrete grid, where each point on the grid corresponds to a cell. Each cell has an internal state, that is iteratively updated, by the application of an update function that takes as input the current state of the cell and it's immediate neighbors, to produce the next state of each cell.
 
-Depending on the update function of the cell, and the initial conditions, vastly different behaviours of the overall system, i.e. the total grid of cells, will emerge over time. We can think about the update function as the genotype of the cell, and the resulting state of the cell as the phenotype of the cell, or it's particular expression, given it's environment. Following this analogy, we can think of the state of the system, as the phenotype of a multicellular organism.
+Depending on the update function of the cell, and the initial conditions, vastly different behaviors of the overall system, i.e. the total grid of cells, will emerge over time. We can think about the update function as the genotype of the cell, and the resulting state of the cell as the phenotype of the cell, or it's particular expression, given it's environment. Following this analogy, we can think of the state of the system, as the phenotype of a multicellular organism.
 
-We can use CA's to model physical phenomena, such as diffusion of particles. In that case, we know the behaviour of each  cell (or particle), but not the resultant emergent behaviour of the entire system, and we can write the rules by hand.
-But what if we the converse is the case: We know the final state of the system, but not the rules (the update function) that govern the individual cells? That's the question the authors answer in the original article, and what leads us to the next topic.
+We can use CA's to model physical phenomena, such as diffusion of particles. In that case, we know the behavior of each  cell (or particle), but not the resultant emergent behavior of the entire system, and we can write the rules by hand.
+But what if the converse is the case: We know the final state of the system, but not the rules (the update function) that govern the individual cells? That's the question the authors answer in the original article, and what leads us to the next topic.
 
 To allow the algorithm to learn the update function using gradient descent, or the like, we can use differentiable programming. Differentiable programming is a programming paradigm where we substitute parts of our program by parameterized differentiable functions. Since the parts are differentiable, we can use gradient descent to find parameters that make our program minimize (or maximize) some differentiable loss function. 
 
@@ -91,7 +91,7 @@ def evolve(timesteps: int, initial_state: Tensor[40, 40, 16], neural_network: Ne
            state_grid[:, :, 3] > 0.1, mature
 
         We first select the cells who are mature themselves,
-        or that have neighbours that are:
+        or that have neighbors that are:
         """
         alive = select_where(state_grid, max_pool_2d(state_grid, kernel_size=(3, 3)) > 0.1)
 
@@ -183,15 +183,13 @@ As you can see above under **growing** this system starts devolving, for most of
 
 To learn an update function that converges to a steady-state, we can modify the training procedure slightly. Instead of always letting the system evolve from the same fixed state, we maintain a pool of previously observed states, and sample an initial state from that pool, at each iteration, to use as our initial condition.
 
-*Note: In practice, when doing batch training, we sample k previous states, and sort them in descending order of loss. The state sampled state with the highest loss is then replaced with the single cell intitial state from above. The authors note that this is needed to stabilize training. But let's ignore that fact here, to make my life easier.*
+*Note: In practice, when doing batch training, we sample k previous states, and sort them in descending order of loss. The state sampled state with the highest loss is then replaced with the single cell initial state from above. The authors note that this is needed to stabilize training. But let's ignore that fact here, to make my life easier.*
 
 ```python
 sample_pool = PoolOfTensors(capacity=1024)
 
-def init_grid_from_pool(batch_size):
-    return sample_pool.sample()
-
-
+def init_grid_from_pool(batch_size: int):
+    return sample_pool.sample(batch_size)
 
 def train(target_image: Tensor[40, 40, 4], iterations: int, network: NeuralNetwork):
     """
@@ -215,4 +213,23 @@ def train(target_image: Tensor[40, 40, 4], iterations: int, network: NeuralNetwo
         update_nn_weights(network, loss)
 ```
 
-TODO: Describe regen training
+The training procedure above gives us a system that evolves to a steady-state (in most cases, see the **ladybug** and the **christmas tree** :O). But if we provoke it by killing some cells, it quickly starts to degenerate (try clicking the **Smiley** on the forehead, to kill some of the cells). 
+
+To mitigate this, we can modify our training procedure, once more. This time we introduce random damage to a subset of the sampled initials state, forcing our update function to learn to converge to our desired state from states that have been damaged. This'll give our system the ability to regenerate!
+I think this deceptively simple way of learning to recover from damage, is one of the most elegant parts of the algorithm.
+
+```python
+def init_grid_from_pool(batch_size: int, num_damaged: int):
+    # Get some initial states
+    samples = sample_pool.sample(num_damaged)
+    
+    # Do some damage!
+    # The "damaging" consists of zeroing out a circle of cell states in the grid,
+    # where the radius and center of each circle
+    # is chosen at random.
+    samples[:num_damaged] = zero_out_circles(samples[:num_damaged])
+```
+
+That's it! Thank you for reading. I hope you've enjoyed this post, and that most of it was relatively intelligible.
+
+Jens.
