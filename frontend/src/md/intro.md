@@ -40,7 +40,7 @@ The authors perform four experiments:
 
 * Further adjust the training procedure, to make the system robust to sporadic damage and enabling it to regrow parts of itself, if cells are removed. This is the coolest one - see it above under **regenerating**.
 
-* TODO: Rotation
+* Rotate the perception of each cell, to show that the cells then evolve a rotate version of their target state (I've not gotten around to implementing this yet, but maybe at a later stage!)
 
 ### Cellular automata
 In it's simplest form, a Cellular Automaton is a discrete model of cells, that reside on a discrete grid, where each point on the grid corresponds to a cell. Each cell has an internal state, that is iteratively updated, by the application of an update function that takes as input the current state of the cell and it's immediate neighbors, to produce the next state of each cell.
